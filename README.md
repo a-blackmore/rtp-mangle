@@ -101,3 +101,10 @@ Set leaf pair 7 on the Y2 side to an absolute value of -400 for all beams and co
 ```
 python mangle.py "input.dcm" "lb1 lp6 pa=-400"
 ```
+
+### Specify the output File
+Set the gantry to 0 in all beams and control points, then save the edits to the filename specified.
+
+```
+python mangle.py "input.dcm" -o "output.dcm" "g=0"
+```
