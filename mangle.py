@@ -7,6 +7,7 @@ import argparse
 import pydicom
 import shlex
 import re
+import numpy as np
 
 # Settings
 
@@ -24,6 +25,9 @@ parser = argparse.ArgumentParser(description='Modify a DICOM-RT Plan File to Add
 parser.add_argument('inFile',                   # Use strings for filenames rather than file objects,
     type=str,                                   # allows pydicom to handle the file operations.
     help='DICOM-RT Plan to Modify.')
+parser.add_argument("-v", "--verbose",
+    help="increase output verbosity",
+    action="store_true")
 parser.add_argument('-o', '--outFile',
     type=str,
     default="out.dcm",
@@ -59,19 +63,30 @@ using the filters.
 ds = pydicom.dcmread(args.inFile)
 
 # Parse Command Strings
-for cmdStr in args.commandString:
+if args.verbose:
+    print("Found " + str(len(args.commandString)) + " command string(s)." )
 
+for cmdStr in args.commandString:
+    if args.verbose:
+        print("\nProcessing Command String: " + cmdStr + "\n" )
+    
     # Prevent Simultaneous Jaw and MLC editing.
     if "lp" in cmdStr or "lb" in cmdStr:
         if "jb" in cmdStr or "j" in cmdStr:
             print("ERROR: Cannot Edit Leaf and Jaw positions in the same command.\n")
             raise ValueError
 
+    # Prevent Simultaneous Relative and Absoulte edits.
+    if "pr=" in cmdStr and "pa=" in cmdStr:
+        print("ERROR: Cannot Edit Relative and Absolute positions in the same command.\n")
+        raise ValueError
+
     cmds = shlex.split(cmdStr)
 
     filters = []
     beams = []
     cps = []
+    pairs = []
 
     filters.append({"name": "beam",        "key": "b",   "default": "*", "matches": ""})
     filters.append({"name": "control pt",  "key": "cp",  "default": "*", "matches": ""})
@@ -81,6 +96,7 @@ for cmdStr in args.commandString:
     filters.append({"name": "leaf bank",   "key": "lb",  "default": "*", "matches": ""})
 
     for f in filters:
+        
         r = re.compile("(^" + f["key"] + "\d+)")
         reArgs = list(filter(r.match, cmds))
 
@@ -93,6 +109,9 @@ for cmdStr in args.commandString:
 
         # Remove the key from the command
         reArgs = reArgs[0][len(f["key"]):]
+                
+        if args.verbose and reArgs != f["default"]:
+            print("Found " + f["name"] + " filter - Value: " + reArgs)
 
         # Handle Multiple Specified Values
         reArgs = reArgs.split(",")
@@ -106,7 +125,7 @@ for cmdStr in args.commandString:
 
         f["matches"] = reArgs
 
-# Gather the data to act upon
+        # Gather the data to act upon
         if f["name"] == "beam": # Build the Beam list.
             if f["matches"][0] == "*":
                 beams = ds.BeamSequence
@@ -128,79 +147,145 @@ for cmdStr in args.commandString:
                             cps.append(beam.ControlPointSequence[int(i)])
                         except IndexError:
                             print("WARNING: Control Point Index Out of Beam Range - Ignoring CP " + i + ".\n")
+        elif f["name"] == "jaw" or f["name"] == "jaw bank" or f["name"] == "leaf bank":
+            if f["matches"][0] == "*":
+                f["matches"] = list(range(0, 2))
+
+        elif f["name"] == "leaf pair":
+                maxPairs = 0
+                for bld in beams[0].BeamLimitingDeviceSequence:
+                    if bld.RTBeamLimitingDeviceType == "MLCX" or bld.RTBeamLimitingDeviceType == "MLCY":
+                        if int(bld.NumberOfLeafJawPairs) > maxPairs:
+                            maxPairs = bld.NumberOfLeafJawPairs
+                if f["matches"][0] == "*":
+                    f["matches"] = list(range(0, maxPairs))
 
 
-"""
-Perform the edits
+    """
+    Perform the edits
 
-Now we have gathered the items to be edited, we can start looking at the setters.
+    Now we have gathered the items to be edited, we can start looking at the setters.
 
-"""
+    """
 
+    # Perform Edits
+    setters = []
+    setters.append({"name": "MU",                  "type": "int",   "key": "mu="})
+    setters.append({"name": "Machine",             "type": "str",   "key": "m="})
+    setters.append({"name": "Gantry",              "type": "int",   "key": "g=",     "attr": "GantryAngle"})
+    setters.append({"name": "Collimator",          "type": "int",   "key": "c=",     "attr": "BeamLimitingDeviceAngle"})
+    setters.append({"name": "Position Absolute",   "type": "int",   "key": "pa=",    "attr": "BeamLimitingDevicePositionSequence"})
+    setters.append({"name": "Position Relative",   "type": "int",   "key": "pr=",    "attr": "BeamLimitingDevicePositionSequence"})
+    
+    for s in setters:
 
-# Perform Edits
-setters = []
-setters.append({"name": "MU",                  "key": "mu="})
-setters.append({"name": "Gantry",              "key": "g=",     "attr": "GantryAngle"})
-setters.append({"name": "Collimator",          "key": "c=",     "attr": "BeamLimitingDeviceAngle"})
-#setters.append({"name": "Position Absolute",   "key": "pa="})
-#setters.append({"name": "Position Relative",   "key": "pr="})
+        if s["type"] == "int":
+            r = re.compile("(" + s["key"] + "[+-]?\d+%?)")
+        else:
+            r = re.compile("(" + s["key"] + "[\']?[a-zA-Z0-9\ ]+[\']?)")
+            
+        reArgs = list(filter(r.match, cmds))
 
-for s in setters:
-    r = re.compile("(" + s["key"] + "[+-]?\d+%?)")
-    reArgs = list(filter(r.match, cmds))
+        if len(reArgs) > 1:
+            # More than one fstring.
+            print("ERROR: More than one " + s["name"] + " set command found.\n")
+            raise ValueError
+        elif len(reArgs) != 1:
+            continue
 
-    if len(reArgs) > 1:
-        # More than one fstring.
-        print("ERROR: More than one " + s["name"] + " set command found.\n")
-        raise ValueError
-    elif len(reArgs) != 1:
-        continue
+        # Remove the key from the command
+        reArg = reArgs[0][len(s["key"]):]
+        
+        if args.verbose:
+            print("Found " + s["name"] + " setter - Value: " + reArg)
 
-    # Remove the key from the command
-    reArg = reArgs[0][len(s["key"]):]
-
-    if s["name"] == "MU":
-        for beam in beams:
-            cmdArg = reArg
-            print("beam")
-            meterset = ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset
-            if cmdArg[0] == "+":
-                cmdArg = cmdArg[1:]
-                if cmdArg[-1] == "%":
-                    cmdArg = cmdArg[:-1]
-                    ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset = meterset * (1+(float(cmdArg)/100))
-                else:
-                    meterset = meterset + cmdArg
-            elif cmdArg[0] == "-":
-                cmdArg = cmdArg[1:]
-                if cmdArg[-1] == "%":
-                    cmdArg = cmdArg[:-1]
-                    ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset = meterset * (1-(float(cmdArg)/100))
-                else:
-                    ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset = meterset - cmdArg
-            else:
-                 meterset = cmdArg
-    else:
-        for cp in cps:
-            cmdArg = reArg
-            if hasattr(cp, s["attr"]):
+        if s["name"] == "MU":
+            for beam in beams:
+                cmdArg = reArg
+                meterset = ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset
                 if cmdArg[0] == "+":
                     cmdArg = cmdArg[1:]
                     if cmdArg[-1] == "%":
                         cmdArg = cmdArg[:-1]
-                        exec("cp." + s["attr"] + "= (cp." + s["attr"] + " * (1 + (" + cmdArg + "/100))")
+                        ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset = meterset * (1+(float(cmdArg)/100))
                     else:
-                        exec("cp." + s["attr"] + "= (cp." + s["attr"] + " + " + cmdArg + ")")
+                        meterset = meterset + cmdArg
                 elif cmdArg[0] == "-":
                     cmdArg = cmdArg[1:]
                     if cmdArg[-1] == "%":
                         cmdArg = cmdArg[:-1]
-                        exec("cp." + s["attr"] + "= (cp." + s["attr"] + " * (1 - (" + cmdArg + "/100))")
+                        ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset = meterset * (1-(float(cmdArg)/100))
                     else:
-                        exec("cp." + s["attr"] + "= (cp." + s["attr"] + " - " + cmdArg + ")")
+                        ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset = meterset - cmdArg
                 else:
-                    exec("cp." + s["attr"] + "=" + cmdArg)
+                     meterset = cmdArg
+        elif s["name"] == "Machine":
+            for beam in beams:
+                cmdArg = reArg
+                beam.TreatmentMachineName = cmdArg
+        else:
+            for cp in cps:
+                cmdArg = reArg
+                if hasattr(cp, s["attr"]):
+                    # Handle Jaw/MLC Changes
+                    if s['name'] == "Position Absolute" or s['name'] == "Position Relative":
+                        if "lp" in cmdStr or "lb" in cmdStr:
+                            # MLCs
+                            lb = [lb["matches"] for lb in filters if lb['name'] == 'leaf bank']
+                            lp = [lp["matches"] for lp in filters if lp['name'] == 'leaf pair']
+
+                            for bld in cp.BeamLimitingDevicePositionSequence:
+                                if bld.RTBeamLimitingDeviceType == "MLCX" or bld.RTBeamLimitingDeviceType == "MLCY":
+                                    banks = []
+                                    banks.append(bld.LeafJawPositions[:maxPairs])
+                                    banks.append(bld.LeafJawPositions[maxPairs:])
+
+                                    for bank in lb:
+                                        for pair in lp:
+                                            if s['name'] == "Position Absolute":
+                                                banks[bank][pair] = cmdArg
+                                            elif s['name'] == "Position Relative":
+                                                pass
+
+                                    bld.LeafJawPositions = banks[0] + banks[1]
+
+                        elif "jb" in cmdStr or "j" in cmdStr:
+                            # Jaws
+                            jb = [jb["matches"] for jb in filters if jb['name'] == 'jaw bank'][0]
+                            j =  [j["matches"]  for j  in filters if j['name']  == 'jaw'][0]
+
+                            target = ""
+                            for jaw in j:
+                                if int(jaw) == 0:
+                                    target = "ASYMX"
+                                elif int(jaw) == 1:
+                                    target = "ASYMY"
+
+                                for bld in cp.BeamLimitingDevicePositionSequence:
+                                    if bld.RTBeamLimitingDeviceType == target:
+                                        for bank in jb:
+                                            if s['name'] == "Position Absolute":
+                                                bld.LeafJawPositions[int(bank)] = cmdArg
+                                            elif s['name'] == "Position Relative":
+                                                pass
+
+                    # Handle Gantry/Collimator Changes
+                    elif cmdArg[0] == "+":
+                        cmdArg = cmdArg[1:]
+                        if cmdArg[-1] == "%":
+                            cmdArg = cmdArg[:-1]
+                            exec("cp." + s["attr"] + "= (cp." + s["attr"] + " * (1 + (" + cmdArg + "/100))")
+                        else:
+                            exec("cp." + s["attr"] + "= (cp." + s["attr"] + " + " + cmdArg + ")")
+                    elif cmdArg[0] == "-":
+                        cmdArg = cmdArg[1:]
+                        if cmdArg[-1] == "%":
+                            cmdArg = cmdArg[:-1]
+                            exec("cp." + s["attr"] + "= (cp." + s["attr"] + " * (1 - (" + cmdArg + "/100))")
+                        else:
+                            exec("cp." + s["attr"] + "= (cp." + s["attr"] + " - " + cmdArg + ")")
+                    else:
+                        exec("cp." + s["attr"] + "=" + cmdArg)
 
 """
 Write the output file.
@@ -214,3 +299,7 @@ if DEBUG:
     print("\nDEBUG: Filters:")
     for f in filters:
         print(f)
+
+    print("\nDEBUG: Setters:")
+    for s in setters:
+        print(s)
