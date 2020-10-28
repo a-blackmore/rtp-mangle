@@ -1,0 +1,5 @@
+# rtp-mangle Pip Requirements
+argparse
+shlex
+re
+pydicom
