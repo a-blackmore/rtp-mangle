@@ -17,7 +17,10 @@ python mangle.py [options] "input.dcm" "<Command String>" ["<Command String>" ..
 ```
 A command string specifies how to edit the RT Plan file - see below for more details. 
 
-Additional options include help (-h), specifying the output file name (-o), verbose mode (-v), and maintain UID mode (-keep-uid). 
+## Options
+Additional options include displaying the help text (-h), specifying the output file name (-o "output.dcm"), verbose mode for command string debugging (-v), and keep SOPInstanceUID mode (-k). 
+
+The keep SOPInstanceUID mode is important for testing - some devices you might be testing will require this to be identical to the original planned treatment in order to allow analysis to be performed. Other systems will refuse to import files with a duplicate UID. The default behaviour of rtp-mangle is to create a new SOPInstanceUID. 
 
 ## Command Strings
 To make edits to the plan, we use a command string. Command strings comprise of two parts - filters and setters. Filters are used to specify which parts of the plan should be changes. Setters are used to make a change. All available filters and setters are listed in the table below.
