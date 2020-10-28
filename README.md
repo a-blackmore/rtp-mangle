@@ -23,13 +23,13 @@ Additional options include displaying the help text (-h), specifying the output 
 The keep SOPInstanceUID mode is important for testing - some devices you might be testing will require this to be identical to the original planned treatment in order to allow analysis to be performed. Other systems will refuse to import files with a duplicate UID. The default behaviour of rtp-mangle is to create a new SOPInstanceUID. 
 
 ## Command Strings
-To make edits to the plan, we use a command string. Command strings comprise of two parts - filters and setters. Filters are used to specify which parts of the plan should be changes. Setters are used to make a change. All available filters and setters are listed in the table below.
+To make edits to the plan, we use a command string. Command strings comprise of two parts - filters and setters. Filters are used to specify which parts of the plan should be changed. Setters are used to make a change. All available filters and setters are listed in the table below.
 
 The simplest command string would have no filters, and include a single setter. For example, "g=0" will set all control points for all beams to deliver at gantry angle 0. Whenever you don't specify a filter, it assumes you want to edit all available items. 
 
 Setters can be given an absolute value like the previous example, or they can perform a relative modification. To increase the gantry angle in every beam and control point by +5 degrees we'd use the command string "g=+5" - or if we wanted to decrease it by -5% we'd use "g=-5%". Note that currently there is no wrap around 360 degrees, so negative values or values >360 degrees are possible - this will probably be rejected when attempting to deliver the plan. 
 
-To set a beam limiting device position absolutlely or relatively, we need to be more specific than this because negative values are allowed and =-10 is ambiguous. Therefore we have pr (position relative) and pa (position absolute) setters.
+To set a beam limiting device position absolutely or relatively, we need to be more specific than this because negative values are allowed and =-10 is ambiguous. Therefore we have pr (position relative) and pa (position absolute) setters.
 
 We can introduce filters to restrict the edits to only the first beam in the file. The string "b0 g=0" will set all control points for only the first beam to deliver at gantry angle 0. Note that filters don't use an equals sign - but setters do. Also, remember that DICOM uses a zero indexing system, so the first beam is beam 0. 
 
