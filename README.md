@@ -68,44 +68,44 @@ Any more complex filtering might require using two command strings one after the
 * You can't edit the Jaw and MLC positions within the same command string, because they both require the pa= and pr= setters. Do one edit and then the next in two separate command strings. 
 * You can't use both the pa= and pr= setters within the same command string. It doesn't make any sense! If you want to shift the absolute position, then perform a relative movement, use two separate command strings. 
 
-## Examples
+# Examples
 
-### Changing the MU
+## Changing the MU
 Our plan has three beams. We need to set the MU of the first beam to 100MU exactly. We need the second beam to be increased by 10MU, and the third beam's MU to be increased by 15%.
 
 ```
 python mangle.py "input.dcm" "b0 mu=100" "b1 mu=+10" "b2 mu=+15%"
 ```
 
-### Changing the Treatment Machine Name
+## Changing the Treatment Machine Name
 We need to deliver this plan on "Linac 2" instead. Note that in some oncology management systems this must be an exact value before being imported.
 
 ```
 python mangle.py "input.dcm" "m='Linac 2'"
 ```
 
-### Changing the Jaw Positions
+## Changing the Jaw Positions
 For the first beam, between control points 12 and 16, we need to move the X jaw (which in our case happens to be j0) on the X2 side (which in our case happens to be jb1) to an absolute position of -5.2.  
 
 ```
 python mangle.py "input.dcm" "b0 cp12-16 j0 jb1 pa=-5.2"
 ```
 
-### Changing the MLC Positions
+## Changing the MLC Positions
 Open all of the Y1 side MLCs an extra 10mm in all control points of the second beam. 
 
 ```
 python mangle.py "input.dcm" "b1 lb0 pr=+10"
 ```
 
-### Simulate a Stuck Leaf
+## Simulate a Stuck Leaf
 Set leaf pair 7 on the Y2 side to an absolute value of -400 for all beams and control points. 
 
 ```
 python mangle.py "input.dcm" "lb1 lp6 pa=-400"
 ```
 
-### Specify the output File
+## Specify the output File
 Set the gantry to 0 in all beams and control points, then save the edits to the filename specified.
 
 ```
