@@ -4,14 +4,10 @@
 
 # Imports
 import argparse
-import pydicom
 import shlex
 import re
-import numpy as np
-
-# Settings
-
-DEBUG = False
+import pydicom
+from pydicom.uid import generate_uid
 
 """
 Parse Command Line Arguments
@@ -27,6 +23,9 @@ parser.add_argument('inFile',                   # Use strings for filenames rath
     help='DICOM-RT Plan to Modify.')
 parser.add_argument("-v", "--verbose",
     help="increase output verbosity",
+    action="store_true")
+parser.add_argument("-k", "--keep_uid",
+    help="Keep Original Instance UID",
     action="store_true")
 parser.add_argument('-o', '--outFile',
     type=str,
@@ -61,6 +60,10 @@ using the filters.
 
 # Open DICOM File in pydicom and retrieve a dataset:
 ds = pydicom.dcmread(args.inFile)
+
+# Unless Instructed, change the file's UID to prevent duplicates. 
+if not args.keep_uid:
+    ds.SOPInstanceUID = generate_uid()
 
 # Parse Command Strings
 if args.verbose:
@@ -293,13 +296,3 @@ Write the output file.
 
 ds.save_as(args.outFile)
 print("Output File " + args.outFile + " created.")
-
-
-if DEBUG:
-    print("\nDEBUG: Filters:")
-    for f in filters:
-        print(f)
-
-    print("\nDEBUG: Setters:")
-    for s in setters:
-        print(s)
