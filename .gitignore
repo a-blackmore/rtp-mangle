@@ -1,1 +1,5 @@
 *.dcm
+*.spec
+__pycache__/
+build/
+dist/
