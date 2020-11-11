@@ -238,6 +238,8 @@ for cmdStr in args.commandString:
                             # Collect the list of Leaf Banks and Leaf Pairs that must be edited.
                             lb = [lb["matches"] for lb in filters if lb['name'] == 'leaf bank'][0]
                             lp = [lp["matches"] for lp in filters if lp['name'] == 'leaf pair'][0]
+                            lb = [int(i) for i in lb] 
+                            lp = [int(i) for i in lp] 
 
                             # Cycle Through the BLD Sequences in the control point. Look for "MLCX" or "MLCY" - Note that futuristic machines with both MLCX and MLCY won't work!
                             for bld in cp.BeamLimitingDevicePositionSequence:
@@ -255,18 +257,7 @@ for cmdStr in args.commandString:
                                                 # Absolute Position Specified. Set each of the pairs to modify in this bank to that value. 
                                                 banks[bank][pair] = cmdArg
                                         elif s['name'] == "Position Relative":
-                                            if cmdArg[0] == "+":
-                                                cmdArgV = cmdArg[1:]                                       
-                                                if cmdArg[-1] == "%":
-                                                    cmdArgV = cmdArgV[:-1]
-                                                    for pair in lp:
-                                                        # Positive Percentage Relative Edit. Increment the existing value by x%.
-                                                        banks[bank][pair] = float(banks[bank][pair]) * (1 + (float(cmdArgV)/100))
-                                                else:
-                                                    for pair in lp:
-                                                        # Positive Relative Edit. Increase the exisiting value.
-                                                        banks[bank][pair] = float(banks[bank][pair]) + float(cmdArgV)
-                                            elif cmdArg[0] == "-":
+                                            if cmdArg[0] == "-":
                                                 cmdArgV = cmdArg[1:]
                                                 if cmdArg[-1] == "%":
                                                     cmdArgV = cmdArgV[:-1]
@@ -277,6 +268,20 @@ for cmdStr in args.commandString:
                                                     for pair in lp:
                                                         # Negative Relative Edit. Decrease the exisiting value.
                                                         banks[bank][pair] = float(banks[bank][pair]) - float(cmdArgV)
+                                            else:
+                                                cmdArgV = cmdArg
+                                                if cmdArg[0] == "+":
+                                                    cmdArgV = cmdArg[1:]
+                                                if cmdArg[-1] == "%":
+                                                    cmdArgV = cmdArgV[:-1]
+                                                    for pair in lp:
+                                                        # Positive Percentage Relative Edit. Increment the existing value by x%.
+                                                        banks[bank][pair] = float(banks[bank][pair]) * (1 + (float(cmdArgV)/100))
+                                                else:
+                                                    for pair in lp:
+                                                        # Positive Relative Edit. Increase the exisiting value.
+                                                        banks[bank][pair] = float(banks[bank][pair]) + float(cmdArgV)
+                                            
 
                                     bld.LeafJawPositions = banks[0] + banks[1]
 
@@ -298,16 +303,7 @@ for cmdStr in args.commandString:
                                             if s['name'] == "Position Absolute":
                                                 bld.LeafJawPositions[int(bank)] = cmdArg
                                             elif s['name'] == "Position Relative":
-                                                if cmdArg[0] == "+":
-                                                    cmdArgV = cmdArg[1:]                                       
-                                                    if cmdArg[-1] == "%":
-                                                        cmdArgV = cmdArgV[:-1]
-                                                        # Positive Percentage Relative Edit. Increment the existing value by x%.
-                                                        bld.LeafJawPositions[int(bank)] = bld.LeafJawPositions[int(bank)] * (1 + (float(cmdArgV)/100))
-                                                    else:
-                                                        # Positive Relative Edit. Increase the exisiting value.
-                                                        bld.LeafJawPositions[int(bank)] = bld.LeafJawPositions[int(bank)] + float(cmdArgV)
-                                                elif cmdArg[0] == "-":
+                                                if cmdArg[0] == "-":
                                                     cmdArgV = cmdArg[1:]
                                                     if cmdArg[-1] == "%":
                                                         cmdArgV = cmdArgV[:-1]
@@ -316,6 +312,17 @@ for cmdStr in args.commandString:
                                                     else:
                                                         # Negative Relative Edit. Increase the exisiting value.
                                                         bld.LeafJawPositions[int(bank)] = bld.LeafJawPositions[int(bank)] - float(cmdArgV)
+                                                else: 
+                                                    cmdArgV = cmdArg
+                                                    if cmdArg[0] == "+":
+                                                        cmdArgV = cmdArg[1:]                                       
+                                                    if cmdArg[-1] == "%":
+                                                        cmdArgV = cmdArgV[:-1]
+                                                        # Positive Percentage Relative Edit. Increment the existing value by x%.
+                                                        bld.LeafJawPositions[int(bank)] = bld.LeafJawPositions[int(bank)] * (1 + (float(cmdArgV)/100))
+                                                    else:
+                                                        # Positive Relative Edit. Increase the exisiting value.
+                                                        bld.LeafJawPositions[int(bank)] = bld.LeafJawPositions[int(bank)] + float(cmdArgV)
 
                     # Handle Gantry/Collimator Changes
                     elif cmdArg[0] == "+":
