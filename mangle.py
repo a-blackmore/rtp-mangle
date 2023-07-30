@@ -212,14 +212,15 @@ for cmdStr in args.commandString:
                         cmdArg = cmdArg[:-1]
                         ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset = meterset * (1+(float(cmdArg)/100))
                     else:
-                        meterset = meterset + cmdArg
+                        ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset = meterset + float(cmdArg)
+
                 elif cmdArg[0] == "-":
                     cmdArg = cmdArg[1:]
                     if cmdArg[-1] == "%":
                         cmdArg = cmdArg[:-1]
                         ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset = meterset * (1-(float(cmdArg)/100))
                     else:
-                        ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset = meterset - cmdArg
+                        ds.FractionGroupSequence[0].ReferencedBeamSequence[beam.BeamNumber - 1].BeamMeterset = meterset - float(cmdArg)
                 else:
                      meterset = cmdArg
         elif s["name"] == "Machine":
